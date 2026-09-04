@@ -10,9 +10,10 @@ Despliegue:       Streamlit Community Cloud (conectado a repositorio GitHub)
 
 import streamlit as st
 import numpy as np
-import cv2
 import joblib
 import os
+from io import BytesIO
+from PIL import Image
 
 # =================================================================================
 # CONFIGURACION DE LA PAGINA
@@ -62,8 +63,8 @@ def preprocesar_imagen(imagen_bytes):
     Convierte bytes de imagen a feature vector preprocesado para el modelo.
 
     PASOS:
-        1. Decodificar bytes a imagen OpenCV (BGR)
-        2. Convertir BGR a escala de grises (1 canal)
+        1. Leer los bytes con Pillow (Image.open + BytesIO)
+        2. Convertir a escala de grises (1 canal, .convert("L"))
         3. Redimensionar a 64x64 pixeles
         4. Aplanar de matriz (64,64) a vector (4096,)
         5. Reshape a (1, 4096) para compatibilidad con sklearn
@@ -73,31 +74,33 @@ def preprocesar_imagen(imagen_bytes):
         imagen_bytes: bytes de la imagen subida por el usuario
 
     RETORNA:
-        imagen_gris: imagen en escala de grises para mostrar en la app
+        imagen_preprocesada: imagen en escala de grises 64x64 (PIL) para mostrar en la app
         features: vector (1, 4096) estandarizado listo para prediccion
     """
-    # Decodificar bytes a imagen numpy usando OpenCV
-    # np.frombuffer convierte bytes a array; cv2.imdecode lee la imagen
-    nparr = np.frombuffer(imagen_bytes, np.uint8)
-    imagen = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    # PASO 1: Leer la imagen desde los bytes subidos y convertirla a escala de grises.
+    # - BytesIO(imagen_bytes): envuelve los bytes en un objeto de flujo de bytes
+    #   para que PIL pueda leerla como un archivo en memoria.
+    # - Image.open(...): abre la imagen con Pillow (PIL).
+    # - .convert("L"): convierte a escala de grises "L" (1 canal, valores 0-255).
+    #   Equivale a cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) que se usaba antes.
+    imagen = Image.open(BytesIO(imagen_bytes)).convert("L")
 
-    # Convertir de BGR (formato OpenCV) a escala de grises
-    # cv2.COLOR_BGR2GRAY: convierte imagen de 3 canales (BGR) a 1 canal (gris)
-    imagen_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+    # PASO 2: Redimensionar a 64x64 pixeles (mismo tamano usado en entrenamiento).
+    # Equivale a cv2.resize(img, (64, 64)).
+    imagen_redim = imagen.resize((IMAGE_SIZE, IMAGE_SIZE))
 
-    # Redimensionar a 64x64 pixeles (mismo tamano usado en entrenamiento)
-    imagen_redim = cv2.resize(imagen_gris, (IMAGE_SIZE, IMAGE_SIZE))
+    # PASO 3: Convertir a array NumPy y aplanar la matriz de 64x64 a un vector
+    # de 4096 elementos. reshape(1, -1) lo pone en formato (1 ejemplo, 4096 features).
+    features = np.array(imagen_redim).reshape(1, IMAGE_SIZE * IMAGE_SIZE)
 
-    # Aplanar la matriz de 64x64 a un vector de 4096 elementos
-    # reshape(1, -1) lo pone en formato (1 ejemplo, 4096 features)
-    features = imagen_redim.reshape(1, IMAGE_SIZE * IMAGE_SIZE)
-
-    # Estandarizar usando el scaler previamente ajustado
+    # PASO 4: Estandarizar usando el scaler previamente ajustado.
     # IMPORTANTE: se usa transform() NO fit_transform() porque el scaler
-    # ya fue ajustado con los datos de entrenamiento
+    # ya fue ajustado con los datos de entrenamiento.
     features = scaler.transform(features)
 
-    return imagen_gris, features
+    # Devolver la imagen redimensionada (PIL) para mostrar en la app
+    # y el vector de features para la prediccion.
+    return imagen_redim, features
 
 # =================================================================================
 # INTERFAZ DE USUARIO - HEADER
