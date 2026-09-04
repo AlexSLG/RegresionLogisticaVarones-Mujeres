@@ -1,0 +1,30 @@
+# Dataset (demasiado grande para GitHub)
+Dataset/
+
+# Archivos de Jupyter
+*.ipynb
+.ipynb_checkpoints/
+
+# Modelo preentrenado de MobileNet (no utilizado)
+*.h5
+
+# Script de entrenamiento (solo se ejecuta localmente)
+modelo_entrenamiento.py
+
+# Cache de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos generados por matplotlib durante EDA
+eda_*.png
+coste_convergencia.png
+analisis_coeficientes.png
+evaluacion_metricas.png
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
